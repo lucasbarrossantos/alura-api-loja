@@ -2,6 +2,7 @@ package br.com.alura.microservice.loja.service;
 
 import br.com.alura.microservice.loja.controller.dto.*;
 import br.com.alura.microservice.loja.model.Compra;
+import br.com.alura.microservice.loja.model.enums.CompraState;
 import br.com.alura.microservice.loja.repository.CompraRepository;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import org.slf4j.Logger;
@@ -35,17 +36,29 @@ public class CompraService {
     @HystrixCommand(fallbackMethod = "realizarCompraFallback", threadPoolKey = "realizaCompraThreadPool")
     public Compra realizarCompra(CompraDTO compraDTO) throws Exception {
         log.info("Iniciando processo de realizar compra...");
+        Compra compraSalva = new Compra();
+        atualizarStatusCompra(compraSalva, CompraState.RECEBIDO);
+
         InfoFornecedorDTO infoFornecedor = httpServiceClient.tratarEnderecoDoFornecedor(compraDTO);
         InfoPedidoDTO dadosPedido = httpServiceClient.realizarPedidoParaFornecedor(compraDTO);
+        atualizarStatusCompra(compraSalva, CompraState.PEDIDO_REALIZADO);
 
         InfoEntregaDTO entregaDTO = montarDadosParaEntrega(compraDTO, infoFornecedor, dadosPedido);
         VoucherDTO voucher = httpServiceClient.reservarEntregaParaTransportador(entregaDTO);
+        atualizarStatusCompra(compraSalva, CompraState.RESERVA_ENTREGA_REALIZADA);
 
         log.info("Compra realizada com sucesso!");
         return tratarRetornoPedido(compraDTO, dadosPedido, voucher);
     }
 
-    private InfoEntregaDTO montarDadosParaEntrega(CompraDTO compraDTO, InfoFornecedorDTO infoFornecedor, InfoPedidoDTO dadosPedido) {
+    public void atualizarStatusCompra(Compra compraSalva, CompraState state) {
+        compraSalva.setState(state);
+        compraRepository.saveAndFlush(compraSalva);
+    }
+
+    private InfoEntregaDTO montarDadosParaEntrega(CompraDTO compraDTO,
+                                                  InfoFornecedorDTO infoFornecedor,
+                                                  InfoPedidoDTO dadosPedido) {
         log.info("Montando dados para entrega");
         InfoEntregaDTO entregaDTO = new InfoEntregaDTO();
         entregaDTO.setPedidoId(dadosPedido.getId());
