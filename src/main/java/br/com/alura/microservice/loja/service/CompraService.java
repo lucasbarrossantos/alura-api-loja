@@ -45,7 +45,6 @@ public class CompraService {
 
         InfoEntregaDTO entregaDTO = montarDadosParaEntrega(compraDTO, infoFornecedor, dadosPedido);
         VoucherDTO voucher = httpServiceClient.reservarEntregaParaTransportador(entregaDTO);
-        atualizarStatusCompra(compraSalva, CompraState.RESERVA_ENTREGA_REALIZADA);
 
         log.info("Compra realizada com sucesso!");
         return tratarRetornoPedido(compraDTO, dadosPedido, voucher);
@@ -92,6 +91,8 @@ public class CompraService {
         compra.setDataParaEntrega(voucher.getPrevisaoParaEntrega());
         compra.setVoucher(voucher.getNumero());
         compra = compraRepository.saveAndFlush(compra);
+
+        atualizarStatusCompra(compra, CompraState.RESERVA_ENTREGA_REALIZADA);
         return compra;
     }
 }
